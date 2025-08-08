@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Finance Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>💰 Finance Tracker</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tab-dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="tab-yearly">Yearly Overview</button>
+      <button class="tab-btn" data-tab="tab-networth">Net Worth</button>
+      <button class="tab-btn" data-tab="tab-ai">AI Insights</button>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar EMI Tracker -->
+    <aside class="sidebar">
+      <h2>📆 EMI Tracker</h2>
+      <form id="emi-form" class="form-inline" aria-label="Add EMI">
+        <input type="text" id="emi-title-input" placeholder="EMI Title" required />
+        <input type="number" id="emi-amount" placeholder="Amount" required />
+        <input type="date" id="emi-due" required />
+        <button type="submit">Add EMI</button>
+      </form>
+      <ul id="emi-list" class="list" aria-live="polite"></ul>
+
+      <hr />
+
+      <!-- Refresh & quick actions -->
+      <div style="margin-top:12px">
+        <button id="refresh-data" title="Reload all data from localStorage">🔄 Refresh Data</button>
+        <button id="clear-data" title="Clear local data (use with caution)">🗑️ Clear All</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <button id="backup-data" title="Export all data to JSON">💾 Backup Data</button>
+        <input type="file" id="restore-data" accept="application/json" style="display:none;" />
+        <button id="restore-btn" title="Import data from JSON">📂 Restore Data</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Dashboard Tab -->
+      <main id="tab-dashboard" class="tab active">
+        <section class="widgets-row" id="widgets-row"></section>
+
+        <section class="card">
+          <h2>🎯 Monthly Savings Goal</h2>
+          <form id="goal-form" class="form-inline" aria-label="Set monthly goal">
+            <input type="number" id="goal-input" placeholder="Monthly Savings Goal ($)" required />
+            <button type="submit">Set Goal</button>
+          </form>
+          <p id="goal-display">No goal set.</p>
+        </section>
+
+        <section class="card">
+          <h2>➕ Add Transaction</h2>
+          <form id="transaction-form" class="form-inline" aria-label="Add transaction">
+            <select id="type" required>
+              <option value="" disabled selected>Type</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <select id="category" required></select>
+            <input type="number" step="0.01" id="amount" placeholder="Amount ($)" required />
+            <input type="date" id="date" required />
+            <select id="repeat">
+              <option value="none" selected>Repeat</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <button type="submit">Add</button>
+          </form>
+          <div class="custom-cat-row" style="margin-top:8px">
+            <input id="new-cat-name" placeholder="Category name" />
+            <input id="new-cat-emoji" placeholder="Emoji" maxlength="4" />
+            <button id="add-category-btn">Add Category</button>
+            <button id="manage-category-btn">Manage Categories</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>📊 Transactions</h2>
+          <div style="margin-bottom:8px;">
+            <select id="filter-type">
+              <option value="all">All Types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <select id="sort-transactions">
+              <option value="date-desc">Date (Oldest)</option>   
+              <option value="date-asc">Date (Newest)</option>
+              <option value="amount-desc">Amount (High → Low)</option>
+              <option value="amount-asc">Amount (Low → High)</option>
+              <option value="category-asc">Category (A → Z)</option>
+              <option value="category-desc">Category (Z → A)</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table id="transactions-table" aria-live="polite">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Balance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="transaction-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card charts">
+          <h2>📈 Charts</h2>
+          <div class="charts-row small-charts">
+            <canvas id="pieChart" width="320" height="220"></canvas>
+            <canvas id="barChart" width="320" height="220"></canvas>
+          </div>
+        </section>
+
+        <section class="card controls">
+          <button id="download-report">Download Excel</button>
+          <button id="download-pdf">Download PDF</button>
+        </section>
+      </main>
+
+      <!-- Yearly Overview Tab -->
+      <main id="tab-yearly" class="tab">
+        <section class="card">
+          <h2>📅 Yearly Overview</h2>
+          <div class="year-controls">
+            <label for="year-select">Year</label>
+            <select id="year-select"></select>
+            <button id="refresh-year">Refresh</button>
+          </div>
+          <canvas id="yearlyChart" width="800" height="260"></canvas>
+          <div class="table-wrap">
+            <table id="yearly-table">
+              <thead>
+                <tr><th>Month</th><th>Income</th><th>Expense</th><th>Savings %</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <!-- Net Worth Tab -->
+      <main id="tab-networth" class="tab">
+        <section class="card">
+          <h2>🏦 Net Worth Tracker</h2>
+          <form id="net-form" class="form-inline">
+            <input type="date" id="net-date" />
+            <input type="number" step="0.01" id="net-asset" placeholder="Assets ($)" required />
+            <input type="number" step="0.01" id="net-liab" placeholder="Liabilities ($)" required />
+            <button id="net-add" type="submit">Add Snapshot</button>
+          </form>
+          <canvas id="netChart" width="800" height="220"></canvas>
+          <div class="table-wrap">
+            <table id="net-table">
+              <thead>
+                <tr><th>Date</th><th>Assets</th><th>Liabilities</th><th>Net Worth</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <!-- AI Insights Tab -->
+      <main id="tab-ai" class="tab">
+        <section class="card">
+          <h2>🤖 AI Insights</h2>
+          <div class="table-wrap">
+            <table id="goal-status-table">
+              <thead>
+                <tr><th>Month</th><th>Goal ($)</th><th>Saved ($)</th><th>Achieved %</th><th>Status</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="ai-analysis" class="ai-box"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Chart Zoom Modal -->
+  <div id="chart-modal" class="modal">
+    <span id="chart-modal-close" class="modal-close">&times;</span>
+    <canvas id="chart-modal-canvas"></canvas>
+  </div>
+
+  <!-- Transaction Edit Modal -->
+  <div id="edit-transaction-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" id="close-edit-transaction">&times;</span>
+      <h3>Edit Transaction</h3>
+      <form id="edit-transaction-form" class="form-inline">
+        <select id="edit-type" required>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+        <select id="edit-category" required></select>
+        <input type="number" step="0.01" id="edit-amount" required />
+        <input type="date" id="edit-date" required />
+        <button type="submit">Save Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Category Management Modal -->
+  <div id="category-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" id="close-category-modal">&times;</span>
+      <h3>Manage Categories</h3>
+      <ul id="category-list" class="list"></ul>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
